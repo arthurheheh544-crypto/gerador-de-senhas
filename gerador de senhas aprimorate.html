@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gerador de Senhas — Fixes & Estilo</title>
+  <style>
+    :root{
+      --bg:#0f1724; --panel:#111421; --muted:#9aa0aa; --text:#e6eef8; --accent1:#06b6d4; --accent2:#8b5cf6; --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;background:radial-gradient(900px 500px at 10% 0%, #08396a22, transparent),radial-gradient(800px 600px at 100% 100%, #6ee7ff11, transparent),var(--bg);color:var(--text);display:grid;place-items:center;padding:28px}
+    .app{width:100%;max-width:920px;background:linear-gradient(180deg,#121424e6,#0f1724e6);border-radius:var(--radius);box-shadow:0 30px 80px rgba(2,6,23,.6);border:1px solid #1f2333;overflow:hidden}
+    header{padding:18px 22px;border-bottom:1px solid #151827;display:flex;align-items:center;gap:12px}
+    header h1{margin:0;font-size:18px}
+    header .tag{margin-left:auto;background:#0d1220;border:1px solid #22263a;padding:6px 10px;border-radius:999px;color:var(--muted);font-size:13px}
+
+    main{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;padding:20px}
+    @media (max-width:920px){main{grid-template-columns:1fr}}
+
+    .pw-box{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:12px;background:#0b0f1b;border-radius:12px;margin-bottom:12px;border:1px solid #1b2030}
+    input.pw{background:transparent;border:0;color:var(--text);outline:none;font-size:16px;padding:6px}
+    .btn{cursor:pointer;border:1px solid #23263a;background:#0f1422;color:var(--text);padding:9px 12px;border-radius:10px;font-weight:600}
+    .btn.primary{background:linear-gradient(90deg,var(--accent1),var(--accent2));border:0;color:#fff}
+
+    .card{background:#0d1222;border-radius:12px;padding:14px;border:1px solid #17192b}
+    .card h2{margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+    .controls{display:grid;gap:12px}
+
+    .range{display:grid;gap:8px}
+    input[type=range]{width:100%}
+
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    @media (max-width:600px){.grid-2{grid-template-columns:1fr}}
+
+    label.chk{display:flex;align-items:center;gap:8px;padding:10px;border-radius:10px;border:1px solid #161826;cursor:pointer}
+    label.chk input{accent-color:var(--accent2)}
+
+    .entropy{margin:10px 0}
+    .bar{height:10px;background:#0a1226;border-radius:999px;overflow:hidden;border:1px solid #20263b}
+    .bar>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent1));transition:width .25s ease}
+    .legend{display:flex;justify-content:space-between;color:var(--muted);font-size:13px;margin-top:8px}
+
+    .actions{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+    .hint{font-size:13px;color:var(--muted)}
+
+    .fav-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .fav-chip{background:#101428;border:1px solid #23283a;padding:8px 10px;border-radius:10px;color:var(--text);font-size:13px;display:inline-flex;align-items:center;gap:8px}
+    .fav-chip button{background:transparent;border:0;color:var(--muted);cursor:pointer}
+
+    .history{display:grid;gap:8px;margin-top:8px;max-height:220px;overflow:auto}
+    .hist-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;border:1px solid #151725;background:#080b16}
+    .small{font-size:13px;color:var(--muted)}
+
+    .toast{position:fixed;right:18px;bottom:18px;background:#071026;padding:10px 14px;border-radius:10px;border:1px solid #233147;display:none;color:var(--text)}
+    .toast.show{display:block}
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Gerador de senhas">
+    <header>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 10h18v10H3z" stroke="currentColor" stroke-width="1.5"/><path d="M7 10V7a5 5 0 0 1 10 0v3" stroke="currentColor" stroke-width="1.5"/></svg>
+      <h1>Gerador de Senhas</h1>
+      <span class="tag">Versão pública</span>
+    </header>
+
+    <main>
+      <!-- coluna esquerda -->
+      <section>
+        <div class="pw-box" aria-live="polite">
+          <input id="password" class="pw" type="password" placeholder="Sua senha aparecerá aqui" readonly />
+          <button class="btn" id="btnToggle" title="Mostrar/ocultar">👁️</button>
+          <button class="btn" id="btnCopy" title="Copiar">Copiar</button>
+          <button class="btn primary" id="btnGenerate" title="Gerar">Gerar</button>
+        </div>
+
+        <div class="card entropy">
+          <h2>Força da senha</h2>
+          <div class="bar" aria-hidden="true"><i id="meter"></i></div>
+          <div class="legend"><span id="strengthLabel">—</span><span id="bitsLabel">0 bits</span></div>
+          <p class="hint">Estimativa baseada em comprimento e conjunto de caracteres.</p>
+        </div>
+
+        <div class="card" style="margin-top:12px;display:flex;justify-content:space-between;gap:12px;align-items:center;">
+          <div>
+            <h2 style="margin-bottom:6px">Favoritos</h2>
+            <div class="fav-list" id="favList"></div>
+          </div>
+          <div style="min-width:140px;text-align:right">
+            <button class="btn" id="btnSaveFav">Salvar padrão</button>
+            <button class="btn" id="btnExportFavs" title="Exportar favoritos">Exportar</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- coluna direita -->
+      <aside class="controls">
+        <div class="card">
+          <h2>Comprimento</h2>
+          <div class="range">
+            <div style="display:flex;justify-content:space-between;align-items:center"><span class="small">Tamanho (4–128)</span><strong><output id="lengthValue">16</output></strong></div>
+            <input type="range" id="length" min="4" max="128" value="16" />
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Conjunto de caracteres</h2>
+          <div class="grid-2" role="group" aria-label="Escolha de caracteres">
+            <label class="chk"><input type="checkbox" id="lower" checked /> Minúsculas (a–z)</label>
+            <label class="chk"><input type="checkbox" id="upper" checked /> Maiúsculas (A–Z)</label>
+            <label class="chk"><input type="checkbox" id="digits" checked /> Números (0–9)</label>
+            <label class="chk"><input type="checkbox" id="symbols" /> Símbolos (!@#…)</label>
+          </div>
+          <div style="margin-top:10px;display:grid;gap:8px;">
+            <label class="chk"><input type="checkbox" id="allowSpaces" /> Permitir espaço</label>
+            <label class="chk"><input type="checkbox" id="requireEach" /> Conter ao menos 1 de cada tipo</label>
+            <label class="chk"><input type="checkbox" id="noSimilar" /> Evitar parecidos (O/0, l/1, I)</label>
+            <label class="chk"><input type="checkbox" id="noRepeat" /> Não repetir caracteres</label>
+            <label class="small">Excluir caracteres (ex.: O0l1I)</label>
+            <input id="exclude" class="pw" type="text" placeholder="Excluir caracteres" style="background:#0b0f1b;border:1px solid #161826;padding:8px;border-radius:8px" />
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Modos rápidos</h2>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" id="modeWifi">Senha Wi‑Fi</button>
+            <button class="btn" id="modePin">PIN</button>
+            <button class="btn" id="modePronounce">Pronunciável</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Histórico (salvo apenas ao copiar)</h2>
+          <div class="history" id="history"></div>
+          <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="btnClearHistory">Limpar histórico</button><button class="btn" id="btnImportFavs">Importar favs</button></div>
+        </div>
+      </aside>
+      
+<div class="card" style="margin-top:20px;text-align:center;">
+  <h2>Apoie este projeto 💜</h2>
+  <p class="small">Se gostou do gerador, considere doar via Pix:</p>
+  
+  <!-- Aqui vai a sua chave Pix -->
+  <input id="pixKey" type="text" value="e89b9450-eb40-4239-8c70-a64bfa355b32" readonly 
+         style="width:100%;padding:10px;text-align:center;border-radius:8px;border:1px solid #222;background:#0b0f1b;color:#fff;margin-bottom:10px;" />
+
+  <button class="btn primary" onclick="copyPix()">📋 Copiar chave Pix</button>
+</div>
+
+<script>
+function copyPix(){
+  const pix = document.getElementById('pixKey');
+  pix.select();
+  pix.setSelectionRange(0, 99999); // para mobile
+  navigator.clipboard.writeText(pix.value).then(()=>{
+    const toast = document.getElementById('toast');
+    toast.textContent = "Chave Pix copiada!";
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'),1600);
+  });
+}
+</script>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">Copiado para a área de transferência</div>
+
+  <script>
+    // ======= Utilidades seguras =======
+    function getRandomInt(max){
+      if (!Number.isInteger(max) || max <= 0) return 0;
+      const limit = Math.floor(0x100000000 / max) * max;
+      const a = new Uint32Array(1);
+      while(true){ window.crypto.getRandomValues(a); if(a[0] < limit) return a[0] % max; }
+    }
+    function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=getRandomInt(i+1); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+
+    // ======= conjuntos =======
+    const SETS = {
+      lower: 'abcdefghijklmnopqrstuvwxyz',
+      upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+      digits: '0123456789',
+      symbols: '!@#$%^&*()_+-=[]{}|;:,.<>/?~`',
+      space: ' '
+    };
+
+    // ======= elementos =======
+    const el = id => document.getElementById(id);
+    const els = {
+      length: el('length'), lengthValue: el('lengthValue'), lower: el('lower'), upper: el('upper'), digits: el('digits'), symbols: el('symbols'), exclude: el('exclude'), requireEach: el('requireEach'), noSimilar: el('noSimilar'), noRepeat: el('noRepeat'), allowSpaces: el('allowSpaces'), password: el('password'), btnGenerate: el('btnGenerate'), btnCopy: el('btnCopy'), btnToggle: el('btnToggle'), meter: el('meter'), bitsLabel: el('bitsLabel'), strengthLabel: el('strengthLabel'), toast: el('toast'), history: el('history'), favList: el('favList'), btnSaveFav: el('btnSaveFav'), modeWifi: el('modeWifi'), modePin: el('modePin'), modePronounce: el('modePronounce'), btnClearHistory: el('btnClearHistory'), btnExportFavs: el('btnExportFavs'), btnImportFavs: el('btnImportFavs')
+    };
+
+    // ======= armazenamento =======
+    const KEY_STATE = 'pwgen:state:v2';
+    const KEY_FAVS = 'pwgen:favs:v2';
+    const KEY_HISTORY = 'pwgen:history:v2';
+
+    function saveState(){
+      const s = {
+        length: +els.length.value,
+        lower: els.lower.checked,
+        upper: els.upper.checked,
+        digits: els.digits.checked,
+        symbols: els.symbols.checked,
+        exclude: els.exclude.value || '',
+        requireEach: els.requireEach.checked,
+        noSimilar: els.noSimilar.checked,
+        noRepeat: els.noRepeat.checked,
+        allowSpaces: els.allowSpaces.checked
+      };
+      localStorage.setItem(KEY_STATE, JSON.stringify(s));
+    }
+    function loadState(){
+      const raw = localStorage.getItem(KEY_STATE);
+      if(!raw) return;
+      try{
+        const s = JSON.parse(raw);
+        els.length.value = s.length || 16; els.lengthValue.textContent = els.length.value;
+        els.lower.checked = !!s.lower; els.upper.checked = !!s.upper; els.digits.checked = !!s.digits; els.symbols.checked = !!s.symbols;
+        els.exclude.value = s.exclude || '';
+        els.requireEach.checked = !!s.requireEach; els.noSimilar.checked = !!s.noSimilar; els.noRepeat.checked = !!s.noRepeat; els.allowSpaces.checked = !!s.allowSpaces;
+      }catch(e){}
+    }
+
+    // ======= charset builder =======
+    function buildCharset(){
+      let pool = '';
+      const chosen = [];
+      if(els.lower.checked) { pool += SETS.lower; chosen.push(SETS.lower); }
+      if(els.upper.checked) { pool += SETS.upper; chosen.push(SETS.upper); }
+      if(els.digits.checked) { pool += SETS.digits; chosen.push(SETS.digits); }
+      if(els.symbols.checked) { pool += SETS.symbols; chosen.push(SETS.symbols); }
+      if(els.allowSpaces.checked) { pool += SETS.space; chosen.push(SETS.space); }
+
+      // excluir semelhantes
+      if(els.noSimilar.checked){
+        const similar = new Set('O0l1I');
+        pool = [...pool].filter(c => !similar.has(c)).join('');
+        for(let i=0;i<chosen.length;i++) chosen[i] = [...chosen[i]].filter(c => !similar.has(c)).join('');
+      }
+
+      // excluir personalizados
+      const ex = new Set(els.exclude.value || '');
+      if(ex.size){ pool = [...pool].filter(c => !ex.has(c)).join(''); for(let i=0;i<chosen.length;i++) chosen[i] = [...chosen[i]].filter(c => !ex.has(c)).join(''); }
+
+      return { pool, chosen };
+    }
+
+    // ======= geração =======
+    function generatePassword(){
+      const length = +els.length.value;
+      const { pool, chosen } = buildCharset();
+      if(!pool.length) { alert('Selecione pelo menos um conjunto de caracteres.'); return ''; }
+      if(els.noRepeat.checked && length > new Set(pool).size){ alert('"Não repetir" exige um conjunto maior que o comprimento.'); return ''; }
+
+      const out = [];
+      // garantir 1 de cada tipo se solicitado
+      if(els.requireEach.checked){
+        for(const set of chosen){ if(set.length) out.push(set[getRandomInt(set.length)]); }
+      }
+      // completar
+      const need = Math.max(0, length - out.length);
+      for(let i=0;i<need;i++){
+        let ch, tries=0;
+        do{ ch = pool[getRandomInt(pool.length)]; tries++; } while(els.noRepeat.checked && out.includes(ch) && tries < 2000);
+        out.push(ch);
+      }
+      return shuffle(out).join('');
+    }
+
+    function generatePronounceable(){
+      // construir sílabas consoante+vogal, mantendo maiúsculas/opções
+      const L = +els.length.value;
+      const vowels = 'aeiou';
+      const consonants = 'bcdfghjklmnpqrstvwxyz';
+      let s = '';
+      while(s.length < L){ const c = consonants[getRandomInt(consonants.length)]; const v = vowels[getRandomInt(vowels.length)]; s += c + v; }
+      s = s.slice(0,L);
+      // aplicar maiúsculas/números se necessário (simples)
+      if(els.upper.checked){ s = s.split('').map((ch,i)=> i%4===0?ch.toUpperCase():ch).join(''); }
+      if(els.digits.checked){ if(L>2){ const pos = Math.floor(L/2); s = s.slice(0,pos-1) + (''+getRandomInt(9)) + s.slice(pos); } }
+      return s;
+    }
+
+    // modos rápidos
+    function setModeWifi(){ els.length.value=20; els.lengthValue.textContent=20; els.lower.checked=true; els.upper.checked=true; els.digits.checked=true; els.symbols.checked=false; els.allowSpaces.checked=false; saveState(); }
+    function setModePin(){ els.length.value=6; els.lengthValue.textContent=6; els.lower.checked=false; els.upper.checked=false; els.digits.checked=true; els.symbols.checked=false; els.allowSpaces.checked=false; saveState(); }
+
+    // ======= força/entropia =======
+    function updateStrength(pwd, poolSize){ const L = pwd.length; const bits = L && poolSize? (L * Math.log2(poolSize)) : 0; els.meter.style.width = Math.min(100,bits).toFixed(0) + '%'; els.bitsLabel.textContent = bits.toFixed(1) + ' bits'; let label = 'Muito fraca'; if(bits>=40 && bits<60) label='Fraca'; else if(bits>=60 && bits<80) label='Média'; else if(bits>=80 && bits<100) label='Forte'; else if(bits>=100) label='Muito forte'; els.strengthLabel.textContent = label; }
+
+    // ======= histórico (somente ao copiar) =======
+    function saveHistory(pwd){ if(!pwd) return; let h = JSON.parse(localStorage.getItem(KEY_HISTORY) || '[]'); // evitar duplicatas consecutivas
+      if(h.length && h[0].pwd === pwd) return; h.unshift({pwd:pwd, ts:Date.now()}); if(h.length>30) h = h.slice(0,30); localStorage.setItem(KEY_HISTORY, JSON.stringify(h)); renderHistory(); }
+
+    function renderHistory(){ const h = JSON.parse(localStorage.getItem(KEY_HISTORY) || '[]'); if(!h.length){ els.history.innerHTML = '<div class="small">Nenhuma senha copiada ainda.</div>'; return;} els.history.innerHTML = h.map((it,idx)=>{
+        const d = new Date(it.ts); const time = d.toLocaleString(); return `<div class="hist-item"><div style="min-width:0"><div style="font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">${it.pwd}</div><div class="small">${time}</div></div><div style="display:flex;gap:8px"><button data-idx="${idx}" class="btn copy-hist">Copiar</button><button data-idx="${idx}" class="btn use-hist">Usar</button><button data-idx="${idx}" class="btn del-hist">Excluir</button></div></div>`}).join('');
+      // vincular handlers
+      document.querySelectorAll('.copy-hist').forEach(b=>b.addEventListener('click',async e=>{ const i = +b.dataset.idx; const arr = JSON.parse(localStorage.getItem(KEY_HISTORY)||'[]'); const pwd = arr[i] && arr[i].pwd; if(pwd){ await navigator.clipboard.writeText(pwd); showToast('Senha copiada do histórico'); } }));
+      document.querySelectorAll('.use-hist').forEach(b=>b.addEventListener('click',e=>{ const i = +b.dataset.idx; const arr = JSON.parse(localStorage.getItem(KEY_HISTORY)||'[]'); const pwd = arr[i] && arr[i].pwd; if(pwd){ els.password.value = pwd; updateStrength(pwd, buildCharset().pool.length || 10); } }));
+      document.querySelectorAll('.del-hist').forEach(b=>b.addEventListener('click',e=>{ const i = +b.dataset.idx; let arr = JSON.parse(localStorage.getItem(KEY_HISTORY)||'[]'); arr.splice(i,1); localStorage.setItem(KEY_HISTORY, JSON.stringify(arr)); renderHistory(); }));
+    }
+
+    // limpar histórico
+    els.btnClearHistory.addEventListener('click',()=>{ localStorage.removeItem(KEY_HISTORY); renderHistory(); showToast('Histórico limpo'); });
+
+    // ======= favoritos (padrões) =======
+    function loadFavs(){ return JSON.parse(localStorage.getItem(KEY_FAVS) || '[]'); }
+    function saveFavs(favs){ localStorage.setItem(KEY_FAVS, JSON.stringify(favs)); renderFavs(); }
+    function addFav(){ const name = prompt('Nome para o padrão (deixe em branco para gerado):'); const fav = { name: name || null, state: { length:+els.length.value, lower:els.lower.checked, upper:els.upper.checked, digits:els.digits.checked, symbols:els.symbols.checked, allowSpaces:els.allowSpaces.checked, exclude:els.exclude.value||'', requireEach:els.requireEach.checked, noSimilar:els.noSimilar.checked, noRepeat:els.noRepeat.checked } }; const f = loadFavs(); f.push(fav); saveFavs(f); showToast('Padrão salvo'); }
+    function renderFavs(){ const f = loadFavs(); if(!f.length){ els.favList.innerHTML = '<div class="small">Nenhum padrão salvo.</div>'; return;} els.favList.innerHTML = ''; f.forEach((fav,i)=>{ const chip = document.createElement('div'); chip.className = 'fav-chip'; const title = document.createElement('span'); title.textContent = fav.name || ('Padrão ' + (i+1)); title.style.cursor = 'pointer'; title.title = 'Aplicar padrão'; title.addEventListener('click',()=>{ applyFav(i); }); const del = document.createElement('button'); del.innerHTML = '✕'; del.title = 'Excluir padrão'; del.addEventListener('click', ()=>{ if(!confirm('Excluir este padrão?')) return; const arr = loadFavs(); arr.splice(i,1); saveFavs(arr); showToast('Padrão excluído'); }); chip.appendChild(title); chip.appendChild(del); els.favList.appendChild(chip); }); }
+    function applyFav(i){ const f = loadFavs(); const fav = f[i]; if(!fav) return; const s = fav.state; els.length.value = s.length || 16; els.lengthValue.textContent = els.length.value; els.lower.checked = !!s.lower; els.upper.checked = !!s.upper; els.digits.checked = !!s.digits; els.symbols.checked = !!s.symbols; els.allowSpaces.checked = !!s.allowSpaces; els.exclude.value = s.exclude || ''; els.requireEach.checked = !!s.requireEach; els.noSimilar.checked = !!s.noSimilar; els.noRepeat.checked = !!s.noRepeat; saveState(); doGenerate(); }
+
+    // exportar favoritos (download .json)
+    els.btnExportFavs.addEventListener('click', ()=>{ const f = loadFavs(); const blob = new Blob([JSON.stringify(f, null, 2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'pwgen-favorites.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); showToast('Favoritos exportados'); });
+    // importar favs (simples prompt paste)
+    els.btnImportFavs.addEventListener('click', ()=>{ const txt = prompt('Cole JSON de favoritos para importar:'); if(!txt) return; try{ const obj = JSON.parse(txt); if(!Array.isArray(obj)) throw new Error('Formato inválido'); localStorage.setItem(KEY_FAVS, JSON.stringify(obj)); renderFavs(); showToast('Favoritos importados'); }catch(e){ alert('JSON inválido'); } });
+
+    els.btnSaveFav.addEventListener('click', addFav);
+
+    // ======= UI ações =======
+    function showToast(msg){ els.toast.textContent = msg; els.toast.classList.add('show'); setTimeout(()=>els.toast.classList.remove('show'),1600); }
+
+    async function copyPassword(){ const pwd = els.password.value; if(!pwd) return; try{ await navigator.clipboard.writeText(pwd); showToast('Senha copiada!'); saveHistory(pwd); }catch(e){ showToast('Falha ao copiar'); } }
+
+    function doGenerate(method){ let pwd = ''; if(method === 'pronounce') pwd = generatePronounceable(); else if(method === 'pin') { const L = +els.length.value; const pool = '0123456789'; pwd = Array.from({length:L},()=>pool[getRandomInt(pool.length)]).join(''); } else if(method === 'wifi') { setModeWifi(); pwd = generatePassword(); } else pwd = generatePassword(); els.password.value = pwd; updateStrength(pwd, buildCharset().pool.length || 10); saveState(); }
+
+    // eventos
+    els.btnGenerate.addEventListener('click', ()=>doGenerate());
+    els.length.addEventListener('input', ()=>{ els.lengthValue.textContent = els.length.value; });
+    els.btnCopy.addEventListener('click', copyPassword);
+    els.btnToggle.addEventListener('click', ()=>{ els.password.type = els.password.type === 'password' ? 'text' : 'password'; });
+    els.modeWifi.addEventListener('click', ()=>{ setModeWifi(); doGenerate(); });
+    els.modePin.addEventListener('click', ()=>{ els.length.value = 6; els.lengthValue.textContent = 6; doGenerate('pin'); });
+    els.modePronounce.addEventListener('click', ()=>{ els.length.value = 12; els.lengthValue.textContent = 12; doGenerate('pronounce'); });
+
+    // atalhos: Espaço para gerar (quando não focado em input), Ctrl/Cmd+Enter também
+    document.addEventListener('keydown', (e)=>{ const tag = document.activeElement.tagName.toLowerCase(); if(tag === 'input' && document.activeElement !== els.password) return; if(e.code === 'Space'){ e.preventDefault(); doGenerate(); } if((e.ctrlKey||e.metaKey) && e.key === 'Enter'){ doGenerate(); } });
+
+    // carregar inicial
+    loadState(); renderFavs(); renderHistory(); doGenerate();
+
+  </script>
+</body>
+</html>
